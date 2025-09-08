@@ -1,4 +1,5 @@
 
+![Kali Workstation Setup Banner](kali-postinstall.png)
 # Kali Workstation Setup
 
 An automated setup script for configuring a complete development and cybersecurity workstation on Kali Linux (or Debian-based systems).
