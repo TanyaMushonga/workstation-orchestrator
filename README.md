@@ -7,6 +7,8 @@
 
 > **One command to bootstrap a consistent developer, DevOps, and security workstation across Linux, macOS, and Windows.**
 
+Organisations and individual makers often spend hours repeating manual setup steps, chasing platform-specific package names, and keeping dotfiles in sync. `workstation-orchestrator` standardises that process: a single, modular toolkit that provisions identical capabilities across all three major operating systems while honouring native package managers and post-install conventions.
+
 ## Table of Contents
 
 1. [Supported Platforms](#supported-platforms)
@@ -85,8 +87,8 @@ Enter `all` to install every group. Pressing Enter at the prompt installs the de
 ### Linux
 
 ```bash
-git clone https://github.com/TanyaMushonga/workstation-kali.git
-cd workstation-kali
+git clone https://github.com/TanyaMushonga/workstation-orchestrator.git
+cd workstation-orchestrator
 chmod +x install.sh
 ./install.sh
 ```
@@ -109,7 +111,7 @@ Requirements: Homebrew installed and accessible on PATH. The installer verifies 
 ```powershell
 # Run PowerShell as Administrator
 Set-ExecutionPolicy RemoteSigned -Scope Process
-cd path\to\workstation-kali
+cd path\to\workstation-orchestrator
 ./install.ps1 -Groups "core,development,devops"
 ```
 
@@ -133,12 +135,12 @@ Omit `-Groups` to accept defaults or pass `all` for the full stack.
 
 ## Project Highlights
 
-- 🔁 **Idempotent installs** – safe to re-run when refreshing existing machines.
-- 🧰 **Curated bundles** – consistent tooling across core dev, DevOps, security, and productivity use-cases.
-- 🧪 **Distro-aware logic** – chooses the right package identifiers for `apt`, `dnf`, `pacman`, Homebrew, and winget.
-- 🗃️ **Modular architecture** – each OS ships its own `groups.sh`, helper library, and post-install routines for easy extension.
-- 🧑‍💻 **Dotfiles friendly** – automatically syncs files from `dotfiles/` and applies shell customisations (Oh My Zsh/Oh My Posh).
-- 🌐 **Cloud-ready** – installs AWS, Azure, and Google Cloud CLIs with optional Kubernetes helpers out of the box.
+- **Idempotent installs** – safe to re-run when refreshing existing machines.
+- **Curated bundles** – consistent tooling across core dev, DevOps, security, and productivity use-cases.
+- **Distro-aware logic** – chooses the right package identifiers for `apt`, `dnf`, `pacman`, Homebrew, and winget.
+- **Modular architecture** – each OS ships its own `groups.sh`, helper library, and post-install routines for easy extension.
+- **Dotfiles friendly** – automatically syncs files from `dotfiles/` and applies shell customisations (Oh My Zsh/Oh My Posh).
+- **Cloud-ready** – installs AWS, Azure, and Google Cloud CLIs with optional Kubernetes helpers out of the box.
 
 ## Post-Install Checklist
 
@@ -190,11 +192,13 @@ We welcome contributions of all sizes—from typo fixes and package suggestions 
 
 ## Support & Feedback
 
-- **Bug reports / Feature requests**: [Open an issue](https://github.com/TanyaMushonga/workstation-kali/issues/new/choose).
+- **Bug reports / Feature requests**: [Open an issue](https://github.com/TanyaMushonga/workstation-orchestrator/issues/new/choose).
 - **Questions & discussion**: Start a GitHub Discussion or comment on the relevant issue/PR.
+- **Professional contact**: [LinkedIn](https://www.linkedin.com/in/tanyaradzwa-t-mushonga-b23745209/)
+- **Portfolio**: [tanyaradzwatmushonga.me](https://tanyaradzwatmushonga.me)
 - **Security disclosures**: Email the maintainer (see Git history) rather than opening a public issue.
 
-If you ship a cool workstation profile using this toolkit, share a link—we love highlighting community setups!
+If you ship a workstation profile using this toolkit, share a link—we enjoy highlighting community setups.
 
 ---
 
