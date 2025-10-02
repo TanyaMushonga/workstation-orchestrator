@@ -95,6 +95,8 @@ chmod +x install.sh
 
 The script detects your distribution, updates package indexes, and prompts for tool groups.
 
+> **Tip:** If you prefer to call the Linux installer directly from `scripts/linux/`, make it executable first (`chmod +x scripts/linux/install.sh`) or invoke it with Bash (`sudo bash scripts/linux/install.sh`). Running `sudo ./install.sh` without the execute bit produces the "permission denied" / "command not found" errors you may have seen.
+
 ### macOS
 
 ```bash
