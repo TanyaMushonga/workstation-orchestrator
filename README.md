@@ -113,7 +113,7 @@ Requirements: Homebrew installed and accessible on PATH. The installer verifies 
 ```powershell
 # Run PowerShell as Administrator
 Set-ExecutionPolicy RemoteSigned -Scope Process
-cd path\to\workstation-orchestrator
+cd path\to\workstation-orchestrator\scripts\windows
 ./install.ps1 -Groups "core,development,devops"
 ```
 
