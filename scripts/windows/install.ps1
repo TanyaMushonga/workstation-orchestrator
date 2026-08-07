@@ -146,6 +146,23 @@ function Ensure-DevDirectories {
 }
 
 function Get-WingetExecutable {
+    # Prefer the real DesktopAppInstaller binary over the App Execution
+    # Alias stub in %LOCALAPPDATA%\Microsoft\WindowsApps\winget.exe. That
+    # alias is a reparse point tied to the interactive, non-elevated user
+    # session; invoking it from an elevated (Administrator) PowerShell
+    # session fails with "The file cannot be accessed by the system" even
+    # though Get-Command still resolves it successfully.
+    $packageRoot = Join-Path $env:ProgramFiles 'WindowsApps'
+    if (Test-Path -LiteralPath $packageRoot) {
+        $installerDir = Get-ChildItem -LiteralPath $packageRoot -Directory -Filter 'Microsoft.DesktopAppInstaller_*' -ErrorAction SilentlyContinue |
+            Where-Object { Test-Path -LiteralPath (Join-Path $_.FullName 'winget.exe') } |
+            Sort-Object { [version]($_.Name -replace '^Microsoft\.DesktopAppInstaller_(\d+(\.\d+){0,3}).*', '$1') } -Descending |
+            Select-Object -First 1
+        if ($installerDir) {
+            return Join-Path $installerDir.FullName 'winget.exe'
+        }
+    }
+
     $command = Get-Command winget.exe -ErrorAction SilentlyContinue
     if ($command) {
         return $command.Source
