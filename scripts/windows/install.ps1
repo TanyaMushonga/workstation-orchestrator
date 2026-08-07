@@ -152,7 +152,10 @@ function Initialize-WinGetPackageManager {
         # Always (re)install rather than reusing whatever is already on the
         # machine: an older cached copy of this module may be missing
         # cmdlet parameters (e.g. -AcceptSourceAgreements) that this script
-        # relies on.
+        # relies on. Unload it first -- Install-Module can't overwrite the
+        # module's files on disk while a prior import (e.g. from an earlier
+        # run of this script in the same PowerShell window) still holds them.
+        Remove-Module Microsoft.WinGet.Client -Force -ErrorAction SilentlyContinue
         Install-Module -Name Microsoft.WinGet.Client -Force -AllowClobber -Scope CurrentUser -Repository PSGallery
         Import-Module Microsoft.WinGet.Client -Force -ErrorAction Stop
 
