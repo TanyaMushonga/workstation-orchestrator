@@ -145,6 +145,44 @@ function Ensure-DevDirectories {
     }
 }
 
+function Get-WingetExecutable {
+    $command = Get-Command winget.exe -ErrorAction SilentlyContinue
+    if ($command) {
+        return $command.Source
+    }
+
+    $command = Get-Command winget -ErrorAction SilentlyContinue
+    if ($command) {
+        return $command.Source
+    }
+
+    $windowsAppsPath = Join-Path $env:LOCALAPPDATA 'Microsoft\WindowsApps\winget.exe'
+    if (Test-Path -LiteralPath $windowsAppsPath) {
+        return $windowsAppsPath
+    }
+
+    return $null
+}
+
+function Invoke-WingetCommand {
+    param(
+        [Parameter(Mandatory)][string[]]$Arguments
+    )
+
+    $wingetPath = Get-WingetExecutable
+    if (-not $wingetPath) {
+        throw 'winget could not be located. Install the Microsoft App Installer from the Microsoft Store and try again.'
+    }
+
+    $output = & $wingetPath @Arguments 2>&1
+    $exitCode = $LASTEXITCODE
+
+    return [pscustomobject]@{
+        ExitCode = $exitCode
+        Output   = $output
+    }
+}
+
 function Install-WingetPackage {
     param(
         [Parameter(Mandatory)][string]$Id,
@@ -156,22 +194,26 @@ function Install-WingetPackage {
     $display = if ($Name) { $Name } else { $Id }
     Write-Host "Installing $display..." -ForegroundColor Cyan
 
-    $arguments = @('install', '--exact', '--id', $Id, '--accept-package-agreements', '--accept-source-agreements', '--silent')
+    $arguments = @('install', '--id', $Id, '--accept-package-agreements', '--accept-source-agreements', '--disable-interactivity', '--silent')
     if ($Source) {
         $arguments += @('--source', $Source)
     }
     if ($AdditionalArgs) {
-        $arguments += $AdditionalArgs.Split(' ')
+        $arguments += $AdditionalArgs.Split(' ', [System.StringSplitOptions]::RemoveEmptyEntries)
     }
 
     try {
-        $process = Start-Process -FilePath "winget" -ArgumentList $arguments -Wait -NoNewWindow -PassThru
-        if ($process.ExitCode -eq 0) {
+        $result = Invoke-WingetCommand -Arguments $arguments
+        if ($result.ExitCode -eq 0) {
             Write-Host "  [OK] $display" -ForegroundColor Green
-        } elseif ($process.ExitCode -eq -1978335189) {
+        } elseif ($result.ExitCode -eq -1978335189 -or (($result.Output | Out-String) -match 'already installed')) {
             Write-Host "  [INFO] $display is already installed" -ForegroundColor Blue
         } else {
-            Write-Warning "  [WARN] winget returned exit code $($process.ExitCode) for $display"
+            Write-Warning "  [WARN] winget returned exit code $($result.ExitCode) for $display"
+            $outputText = ($result.Output | Out-String).Trim()
+            if ($outputText) {
+                Write-Host "    $outputText" -ForegroundColor DarkYellow
+            }
         }
     }
     catch {
