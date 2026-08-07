@@ -27,6 +27,10 @@ param(
 # Set strict error handling
 $ErrorActionPreference = 'Stop'
 
+# Set by Initialize-WinGetPackageManager; when $true, package installs go
+# through the Microsoft.WinGet.Client module instead of shelling to winget.exe.
+$script:UseWinGetModule = $false
+
 # Check execution policy
 if (-not $SkipPolicyCheck) {
     $currentPolicy = Get-ExecutionPolicy -Scope CurrentUser
@@ -129,6 +133,48 @@ function Install-WingetIfMissing {
     }
 }
 
+function Initialize-WinGetPackageManager {
+    # winget.exe is delivered as an MSIX-packaged app whose registration is
+    # tied to the specific user session it was installed under. An elevated
+    # Administrator token is a different session, so invoking winget.exe
+    # directly from an elevated script commonly fails with "Access is
+    # denied" or "The file cannot be accessed by the system" even though
+    # the same command works fine in a non-elevated window. Per Microsoft's
+    # own troubleshooting guidance, the Microsoft.WinGet.Client PowerShell
+    # module (which talks to the package manager via COM instead of
+    # shelling out to the CLI) is the supported way to drive winget from
+    # scripts like this one, so prefer it when available.
+    Write-Host "Preparing winget PowerShell module..." -ForegroundColor Cyan
+    try {
+        if (-not (Get-Module -ListAvailable -Name Microsoft.WinGet.Client)) {
+            if (-not (Get-PackageProvider -Name NuGet -ErrorAction SilentlyContinue)) {
+                Install-PackageProvider -Name NuGet -Force -Scope CurrentUser | Out-Null
+            }
+            Install-Module -Name Microsoft.WinGet.Client -Force -AllowClobber -Scope CurrentUser -Repository PSGallery
+        }
+        Import-Module Microsoft.WinGet.Client -ErrorAction Stop
+
+        try {
+            Repair-WinGetPackageManager -Force -Latest -ErrorAction Stop
+        }
+        catch {
+            Write-Warning "Repair-WinGetPackageManager reported an issue (continuing anyway): $($_.Exception.Message)"
+        }
+
+        if (Get-Command Install-WinGetPackage -ErrorAction SilentlyContinue) {
+            Write-Host "[OK] Microsoft.WinGet.Client module ready" -ForegroundColor Green
+            $script:UseWinGetModule = $true
+            return
+        }
+    }
+    catch {
+        Write-Warning "Could not prepare Microsoft.WinGet.Client module: $($_.Exception.Message)"
+    }
+
+    Write-Warning "Falling back to winget.exe directly. If installs fail with 'Access is denied', re-run from a non-elevated PowerShell session, or install the module manually with: Install-Module Microsoft.WinGet.Client -Scope CurrentUser"
+    $script:UseWinGetModule = $false
+}
+
 function Ensure-DevDirectories {
     Write-Host "Creating development directories..." -ForegroundColor Cyan
     $paths = @(
@@ -210,6 +256,36 @@ function Install-WingetPackage {
 
     $display = if ($Name) { $Name } else { $Id }
     Write-Host "Installing $display..." -ForegroundColor Cyan
+
+    if ($script:UseWinGetModule) {
+        try {
+            $moduleParams = @{
+                Id                      = $Id
+                Mode                    = 'Silent'
+                AcceptPackageAgreements = $true
+                AcceptSourceAgreements  = $true
+                ErrorAction             = 'Stop'
+            }
+            if ($Source) { $moduleParams['Source'] = $Source }
+
+            $result = Install-WinGetPackage @moduleParams
+            if (-not $result -or -not $result.Status -or $result.Status -eq 'Ok') {
+                Write-Host "  [OK] $display" -ForegroundColor Green
+            } elseif ($result.Status -match 'AlreadyInstalled') {
+                Write-Host "  [INFO] $display is already installed" -ForegroundColor Blue
+            } else {
+                Write-Warning "  [WARN] winget module returned status '$($result.Status)' for $display"
+            }
+            return
+        }
+        catch {
+            if ($_.Exception.Message -match 'already installed|found an existing package') {
+                Write-Host "  [INFO] $display is already installed" -ForegroundColor Blue
+                return
+            }
+            Write-Warning "  [WARN] Microsoft.WinGet.Client failed for ${display}: $($_.Exception.Message). Falling back to winget.exe."
+        }
+    }
 
     $arguments = @('install', '--id', $Id, '--accept-package-agreements', '--accept-source-agreements', '--disable-interactivity', '--silent')
     if ($Source) {
@@ -320,6 +396,7 @@ Write-Host ""
 
 # Install winget if needed
 Install-WingetIfMissing
+Initialize-WinGetPackageManager
 
 Write-Host ""
 Write-Host "Available tool groups:" -ForegroundColor Cyan
