@@ -146,16 +146,27 @@ function Initialize-WinGetPackageManager {
     # scripts like this one, so prefer it when available.
     Write-Host "Preparing winget PowerShell module..." -ForegroundColor Cyan
     try {
-        if (-not (Get-Module -ListAvailable -Name Microsoft.WinGet.Client)) {
-            if (-not (Get-PackageProvider -Name NuGet -ErrorAction SilentlyContinue)) {
-                Install-PackageProvider -Name NuGet -Force -Scope CurrentUser | Out-Null
-            }
-            Install-Module -Name Microsoft.WinGet.Client -Force -AllowClobber -Scope CurrentUser -Repository PSGallery
+        if (-not (Get-PackageProvider -Name NuGet -ErrorAction SilentlyContinue)) {
+            Install-PackageProvider -Name NuGet -Force -Scope CurrentUser | Out-Null
         }
-        Import-Module Microsoft.WinGet.Client -ErrorAction Stop
+        # Always (re)install rather than reusing whatever is already on the
+        # machine: an older cached copy of this module may be missing
+        # cmdlet parameters (e.g. -AcceptSourceAgreements) that this script
+        # relies on.
+        Install-Module -Name Microsoft.WinGet.Client -Force -AllowClobber -Scope CurrentUser -Repository PSGallery
+        Import-Module Microsoft.WinGet.Client -Force -ErrorAction Stop
 
         try {
-            Repair-WinGetPackageManager -Force -Latest -ErrorAction Stop
+            $repairCommand = Get-Command Repair-WinGetPackageManager -ErrorAction Stop
+            $repairParams = @{ Force = $true; Latest = $true; ErrorAction = 'Stop' }
+            if ((Test-IsAdministrator) -and $repairCommand.Parameters.ContainsKey('AllUsers')) {
+                # Repair-WinGetPackageManager needs -AllUsers to actually
+                # register winget for an elevated session; without it, the
+                # repair silently fails with "Try running with -AllUsers
+                # in administrator mode" even though we're already elevated.
+                $repairParams['AllUsers'] = $true
+            }
+            Repair-WinGetPackageManager @repairParams
         }
         catch {
             Write-Warning "Repair-WinGetPackageManager reported an issue (continuing anyway): $($_.Exception.Message)"
@@ -259,14 +270,28 @@ function Install-WingetPackage {
 
     if ($script:UseWinGetModule) {
         try {
-            $moduleParams = @{
-                Id                      = $Id
-                Mode                    = 'Silent'
-                AcceptPackageAgreements = $true
-                AcceptSourceAgreements  = $true
-                ErrorAction             = 'Stop'
+            # Build the parameter set from whatever the loaded module
+            # version actually supports, rather than assuming a fixed
+            # cmdlet signature -- Install-WinGetPackage's parameters have
+            # changed across Microsoft.WinGet.Client releases (e.g. older
+            # versions lack -AcceptSourceAgreements), and machines may have
+            # a version pinned that differs from what this script expects.
+            $installCommand = Get-Command Install-WinGetPackage -ErrorAction Stop
+            $moduleParams = @{ Id = $Id; ErrorAction = 'Stop' }
+            if ($installCommand.Parameters.ContainsKey('Mode')) {
+                $moduleParams['Mode'] = 'Silent'
+            } elseif ($installCommand.Parameters.ContainsKey('Silent')) {
+                $moduleParams['Silent'] = $true
             }
-            if ($Source) { $moduleParams['Source'] = $Source }
+            if ($installCommand.Parameters.ContainsKey('AcceptPackageAgreements')) {
+                $moduleParams['AcceptPackageAgreements'] = $true
+            }
+            if ($installCommand.Parameters.ContainsKey('AcceptSourceAgreements')) {
+                $moduleParams['AcceptSourceAgreements'] = $true
+            }
+            if ($Source -and $installCommand.Parameters.ContainsKey('Source')) {
+                $moduleParams['Source'] = $Source
+            }
 
             $result = Install-WinGetPackage @moduleParams
             if (-not $result -or -not $result.Status -or $result.Status -eq 'Ok') {
